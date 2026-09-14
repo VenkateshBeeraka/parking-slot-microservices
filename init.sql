@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS slot_booking (
 -- Users: Admin and regular users
 INSERT INTO users (id, name, email, password, role, city) VALUES
 (1, 'Admin User', 'admin@parking.com', 'admin123', 'ADMIN', 'Hyderabad'),
-(2, 'John Doe', 'john.doe@example.com', 'user123', 'USER', 'Bangalore'),
+(2, 'Venkatesh Beeraka', 'venkateshbeeraka5@gmail.com', 'user123', 'USER', 'Bangalore'),
 (3, 'Alice Smith', 'alice.smith@example.com', 'user123', 'USER', 'Mumbai')
 ON CONFLICT (id) DO NOTHING;
 

@@ -52,6 +52,13 @@ public class ApiGatewayConfiguration {
 				.route("admin-service-direct", p -> p.path("/admin-service/**")
 						.filters(f -> f.rewritePath("/admin-service/(?<segment>.*)", "/${segment}"))
 						.uri("lb://admin-service"))
+
+				// Notification Service routes
+				.route("notification-service", p -> p.path("/notifications/**")
+						.uri("lb://notification-service"))
+				.route("notification-service-direct", p -> p.path("/notification-service/**")
+						.filters(f -> f.rewritePath("/notification-service/(?<segment>.*)", "/${segment}"))
+						.uri("lb://notification-service"))
 				.build();
 	}
 }
