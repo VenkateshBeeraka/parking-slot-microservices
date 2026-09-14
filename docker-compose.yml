@@ -1,0 +1,296 @@
+networks:
+  parking-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+
+services:
+  # ---------------------------------------------------------------------------
+  # 0. PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: parking-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: parkingslots
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d parkingslots"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 1. Distributed Tracing (OpenZipkin)
+  # ---------------------------------------------------------------------------
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: parking-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    environment:
+      STORAGE_TYPE: mem
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 2. Eureka Service Registry & Discovery
+  # ---------------------------------------------------------------------------
+  naming-server:
+    build:
+      context: ./naming-server
+      dockerfile: Dockerfile
+    container_name: naming-server
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_APPLICATION_NAME: naming-server
+      SERVER_PORT: 8761
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 3. Centralized Spring Cloud Config Server
+  # ---------------------------------------------------------------------------
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    container_name: config-server
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    depends_on:
+      - naming-server
+    environment:
+      SPRING_APPLICATION_NAME: config-server
+      SERVER_PORT: 8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 4. Spring Cloud API Gateway (Single Entry Point)
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    depends_on:
+      - naming-server
+      - zipkin
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 8765
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 5. Auth Service (Authentication & JWT Issuance)
+  # ---------------------------------------------------------------------------
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: auth-service
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 6. User Service (User Profiles & Management)
+  # ---------------------------------------------------------------------------
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 7. Building Service (Building CRUD & Search)
+  # ---------------------------------------------------------------------------
+  building-service:
+    build:
+      context: ./building-service
+      dockerfile: Dockerfile
+    container_name: building-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: building-service
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 8. Slot Service (Parking Slot Definitions & Floors)
+  # ---------------------------------------------------------------------------
+  slot-service:
+    build:
+      context: ./slot-service
+      dockerfile: Dockerfile
+    container_name: slot-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: slot-service
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 9. Availability Service (Availability & Bookings)
+  # ---------------------------------------------------------------------------
+  availability-service:
+    build:
+      context: ./availability-service
+      dockerfile: Dockerfile
+    container_name: availability-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: availability-service
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
+
+  # ---------------------------------------------------------------------------
+  # 10. Admin Service (Dashboard Aggregator via OpenFeign)
+  # ---------------------------------------------------------------------------
+  admin-service:
+    build:
+      context: ./admin-service
+      dockerfile: Dockerfile
+    container_name: admin-service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      naming-server:
+        condition: service_started
+      zipkin:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: admin-service
+      SERVER_PORT: 8086
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/parkingslots
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://naming-server:8761/eureka
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_CLOUD_COMPATIBILITY_VERIFIER_ENABLED: "false"
+    networks:
+      - parking-network
