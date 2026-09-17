@@ -153,7 +153,8 @@ Each microservice is self-contained with its own lifecycle, port allocation, and
 - **Port**: `8765`
 - **Run (Maven)**: `mvn spring-boot:run -pl api-gateway`
 - **Run (Docker)**: `docker compose up -d api-gateway`
-- **Swagger URL**: *N/A (Aggregates routing to services)*
+- **Swagger UI**: [http://localhost:8765/swagger-ui.html](http://localhost:8765/swagger-ui.html) *(Aggregates all microservice APIs with interactive definition dropdown)*
+- **OpenAPI JSON**: [http://localhost:8765/v3/api-docs](http://localhost:8765/v3/api-docs)
 - **Dashboard / Actuator URL**:
   - Health: [http://localhost:8765/actuator/health](http://localhost:8765/actuator/health)
   - Routes: [http://localhost:8765/actuator/gateway/routes](http://localhost:8765/actuator/gateway/routes)
