@@ -78,7 +78,7 @@ public class SlotBookingService {
 						}
 						Availability avail = slot.getAvailability();
 
-						if (bookingdate.after(avail.getFromDate()) && bookingdate.before(avail.getToDate())) {
+						if (!bookingdate.before(avail.getFromDate()) && !bookingdate.after(avail.getToDate())) {
 							List<SlotBooking> abook = avail.getBookings();
 							if (abook == null) {
 								abook = new ArrayList<>();

@@ -31,7 +31,7 @@ public class SlotsController {
 		return ResponseEntity.status(HttpStatus.CREATED).body("Slots added to the Building number " + buildingNumber);
 	}
 
-	@PreAuthorize("hasAuthority('admin')")
+	@PreAuthorize("hasAnyAuthority('user', 'admin')")
 	@GetMapping(path = RestUri.SLOTS)
 	public ResponseEntity<List<SlotDTO>> findAllSlots(@PathVariable String buildingNumber) {
 		List<SlotDTO> slots = slotService.getAllSlots(buildingNumber);

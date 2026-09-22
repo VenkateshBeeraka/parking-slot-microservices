@@ -24,7 +24,7 @@ public class SlotBookingController {
 	@Autowired
 	private SlotBookingService slotBookingService;
 
-	@PreAuthorize("hasAuthority('user')")
+	@PreAuthorize("hasAnyAuthority('user', 'admin')")
 	@PostMapping(path = RestUri.BOOKING)
 	public ResponseEntity<String> bookSlot(@PathVariable String buildingNumber, @PathVariable String slotNumber,
 			@PathVariable @DateTimeFormat(pattern = "yyyy-MM-dd") Date date) {
@@ -42,7 +42,7 @@ public class SlotBookingController {
 		return ResponseEntity.ok(slotBookingService.countBookings());
 	}
 
-	@GetMapping(path = "/booking")
+	@GetMapping(path = {"/booking", "/booking/all"})
 	public ResponseEntity<List<SlotBooking>> getAllBookings() {
 		return ResponseEntity.ok(slotBookingService.getAllBookings());
 	}

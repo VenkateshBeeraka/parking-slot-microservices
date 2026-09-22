@@ -84,14 +84,9 @@ public class SlotService {
 
 	public List<SlotDTO> getAllSlots(String buildingNumber) {
 		List<SlotDTO> list = new ArrayList<>();
-
-		User us = authenticationRepository.findById(idheader()).orElse(null);
-		if (us == null || us.getBuildings() == null || us.getBuildings().isEmpty()) {
-			throw new ResourceNotFoundException("No buildings associated with user");
-		}
-		List<Building> listofBuildings = us.getBuildings();
-		for (Building bld : listofBuildings) {
-			if (bld.getBuildingNumber().equals(buildingNumber)) {
+		List<Building> allBuildings = buildingRepository.findAll();
+		for (Building bld : allBuildings) {
+			if (bld.getBuildingNumber().equalsIgnoreCase(buildingNumber)) {
 				List<Slot> slots = bld.getSlots();
 				if (slots != null) {
 					for (Slot s : slots) {
@@ -102,7 +97,7 @@ public class SlotService {
 				return list;
 			}
 		}
-		throw new ResourceNotFoundException("Invalid Building number " + buildingNumber);
+		throw new ResourceNotFoundException("No Building found with building number " + buildingNumber);
 	}
 
 	public String removeSlots(String buildNumber, String slotNumber) {

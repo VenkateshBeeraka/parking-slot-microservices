@@ -83,87 +83,38 @@ public class AvailabilityService {
 	}
 
 	public List<String> findAvailability(String buildingNumber, Date date) {
-		String role = getRoleHeader();
-		Integer userId = idheader();
-		ArrayList<String> slots = new ArrayList<>();
-
-		if (role.equals("admin")) {
-			User user = authenticationRepository.findById(userId).orElse(null);
-			if (user == null || user.getBuildings() == null || user.getBuildings().isEmpty())
-				throw new ResourceNotFoundException("Building are not present for this Admin");
-
-			for (Building building : user.getBuildings()) {
-				if (building.getBuildingNumber().equals(buildingNumber)) {
-					if (building.getSlots() == null || building.getSlots().isEmpty()) {
-						throw new ResourceNotFoundException("No Slots Available for This Building");
-					}
-					for (Slot slot : building.getSlots()) {
-						if (slot.getAvailability() != null) {
-							Availability ava = slot.getAvailability();
-							if (date.after(ava.getFromDate()) && date.before(ava.getToDate())) {
-								if (ava.getBookings() == null || ava.getBookings().isEmpty()) {
-									slots.add(slot.getSlotNumber());
+		List<String> result = new ArrayList<>();
+		List<Building> list = buildingRepository.findAll();
+		for (Building building : list) {
+			if (building.getBuildingNumber().equalsIgnoreCase(buildingNumber)) {
+				List<Slot> listS = building.getSlots();
+				if (listS != null) {
+					for (Slot s : listS) {
+						if (s.getAvailability() != null) {
+							Availability availability = s.getAvailability();
+							if (!date.before(availability.getFromDate()) && !date.after(availability.getToDate())) {
+								if (availability.getBookings() == null || availability.getBookings().isEmpty()) {
+									result.add(s.getSlotNumber());
 								} else {
 									boolean available = true;
-									for (SlotBooking bk : ava.getBookings()) {
+									for (SlotBooking bk : availability.getBookings()) {
 										if (bk.getBookingDate().equals(date)) {
 											available = false;
 											break;
 										}
 									}
 									if (available) {
-										slots.add(slot.getSlotNumber());
-									}
-								}
-							}
-						}
-					}
-					if (slots.isEmpty()) {
-						throw new ResourceNotFoundException("No Slots are present in that Building");
-					} else {
-						return slots;
-					}
-				}
-			}
-			throw new ResourceNotFoundException("Invalid Building Id");
-		} else {
-			List<String> result = new ArrayList<>();
-			List<Building> list = buildingRepository.findAll();
-			for (Building building : list) {
-				if (building.getBuildingNumber().equals(buildingNumber)) {
-					List<Slot> listS = building.getSlots();
-					if (listS != null) {
-						for (Slot s : listS) {
-							if (s.getAvailability() != null) {
-								Availability availability = s.getAvailability();
-								if (date.after(availability.getFromDate()) && date.before(availability.getToDate())) {
-									if (availability.getBookings() == null || availability.getBookings().isEmpty()) {
 										result.add(s.getSlotNumber());
-									} else {
-										boolean available = true;
-										for (SlotBooking bk : availability.getBookings()) {
-											if (bk.getBookingDate().equals(date)) {
-												available = false;
-												break;
-											}
-										}
-										if (available) {
-											result.add(s.getSlotNumber());
-										}
 									}
 								}
 							}
 						}
 					}
-					if (result.isEmpty()) {
-						throw new ResourceNotFoundException("No Slots are present in that Building for booking");
-					} else {
-						return result;
-					}
 				}
+				return result;
 			}
-			throw new ResourceNotFoundException("No Buildings Available for this user");
 		}
+		throw new ResourceNotFoundException("No Building found with number " + buildingNumber);
 	}
 
 	public String deleteAvailability(String buildNumber, String slotNo) {
