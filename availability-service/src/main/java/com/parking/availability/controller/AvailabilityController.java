@@ -20,6 +20,8 @@ import com.parking.availability.service.AvailabilityService;
 import com.parking.common.constant.RestUri;
 import com.parking.common.dto.AvailabilityDTO;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 public class AvailabilityController {
 
@@ -43,9 +45,15 @@ public class AvailabilityController {
 		return ResponseEntity.status(HttpStatus.OK).body("Removed avaliability for slot");
 	}
 
-	@GetMapping(path = RestUri.AVAILABILITY)
-	public ResponseEntity<List<String>> getAvailability(@PathVariable String buildNumber,
-			@PathVariable @DateTimeFormat(pattern = "yyyy-MM-dd") Date date) {
-		return ResponseEntity.status(HttpStatus.OK).body(availabilityService.findAvailability(buildNumber, date));
+	@GetMapping(path = {RestUri.AVAILABILITY, "/availability/{buildNumber}"})
+	public ResponseEntity<List<String>> getAvailability(
+			@PathVariable String buildNumber,
+			@PathVariable(required = false) Date date,
+			@RequestParam(name = "date", required = false) Date dateParam) {
+		Date searchDate = (date != null) ? date : dateParam;
+		if (searchDate == null) {
+			searchDate = new Date();
+		}
+		return ResponseEntity.status(HttpStatus.OK).body(availabilityService.findAvailability(buildNumber, searchDate));
 	}
 }

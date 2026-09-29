@@ -43,7 +43,7 @@ public class EmailNotificationService {
 		String recipient = event.getRecipientEmail();
 		String subject = "✅ Parking Slot Confirmed - Slot " + event.getSlotNumber() + " (" + event.getBuildingName() + ")";
 		String formattedDate = event.getBookingDate() != null
-				? new SimpleDateFormat("yyyy-MM-dd").format(event.getBookingDate())
+				? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(event.getBookingDate())
 				: "N/A";
 
 		String plainTextBody = buildPlainTextEmail(event, formattedDate);

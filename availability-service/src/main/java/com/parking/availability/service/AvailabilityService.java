@@ -98,7 +98,7 @@ public class AvailabilityService {
 								} else {
 									boolean available = true;
 									for (SlotBooking bk : availability.getBookings()) {
-										if (bk.getBookingDate().equals(date)) {
+										if (isSameSecond(bk.getBookingDate(), date) && !"CLOSED".equalsIgnoreCase(bk.getStatus())) {
 											available = false;
 											break;
 										}
@@ -115,6 +115,13 @@ public class AvailabilityService {
 			}
 		}
 		throw new ResourceNotFoundException("No Building found with number " + buildingNumber);
+	}
+
+	private boolean isSameSecond(Date d1, Date d2) {
+		if (d1 == null || d2 == null) {
+			return false;
+		}
+		return (d1.getTime() / 1000) == (d2.getTime() / 1000);
 	}
 
 	public String deleteAvailability(String buildNumber, String slotNo) {

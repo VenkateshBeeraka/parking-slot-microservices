@@ -12,7 +12,10 @@ import jakarta.persistence.TemporalType;
 
 import org.springframework.format.annotation.DateTimeFormat;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.parking.common.config.MultiDateDeserializer;
 
 @Entity
 public class SlotBooking {
@@ -22,8 +25,10 @@ public class SlotBooking {
 
 	private String status = "SLOT BOOKED";
 
-	@DateTimeFormat(pattern = "yyyy-MM-dd")
-	@Temporal(TemporalType.DATE)
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@Temporal(TemporalType.TIMESTAMP)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date bookingDate;
 
 	@JsonIgnore

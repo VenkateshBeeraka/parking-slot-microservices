@@ -9,6 +9,14 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.parking.common.config.MultiDateDeserializer;
 
 @Entity
 public class Availability {
@@ -16,7 +24,17 @@ public class Availability {
 	@Id
 	@GeneratedValue
 	private Integer id;
+
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@Temporal(TemporalType.TIMESTAMP)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date fromDate;
+
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@Temporal(TemporalType.TIMESTAMP)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date toDate;
 
 	@OneToMany(cascade = CascadeType.ALL, targetEntity = SlotBooking.class)

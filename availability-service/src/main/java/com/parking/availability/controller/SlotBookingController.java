@@ -18,6 +18,8 @@ import com.parking.availability.service.SlotBookingService;
 import com.parking.common.constant.RestUri;
 import com.parking.common.entity.SlotBooking;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 public class SlotBookingController {
 
@@ -25,10 +27,24 @@ public class SlotBookingController {
 	private SlotBookingService slotBookingService;
 
 	@PreAuthorize("hasAnyAuthority('user', 'admin')")
-	@PostMapping(path = RestUri.BOOKING)
-	public ResponseEntity<String> bookSlot(@PathVariable String buildingNumber, @PathVariable String slotNumber,
-			@PathVariable @DateTimeFormat(pattern = "yyyy-MM-dd") Date date) {
-		return ResponseEntity.status(HttpStatus.OK).body(slotBookingService.bookSlot(buildingNumber, slotNumber, date));
+	@PostMapping(path = {RestUri.BOOKING, "/booking/{buildingNumber}/{slotNumber}"})
+	public ResponseEntity<String> bookSlot(
+			@PathVariable String buildingNumber,
+			@PathVariable String slotNumber,
+			@PathVariable(required = false) Date date,
+			@RequestParam(name = "date", required = false) Date dateParam) {
+		Date bookingDate = (date != null) ? date : dateParam;
+		if (bookingDate == null) {
+			throw new IllegalArgumentException("Booking date and time must be provided (e.g., 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-ddTHH:mm:ss')");
+		}
+		return ResponseEntity.status(HttpStatus.OK).body(slotBookingService.bookSlot(buildingNumber, slotNumber, bookingDate));
+	}
+
+	@PreAuthorize("hasAuthority('admin')")
+	@PostMapping(path = "/booking/close-expired")
+	public ResponseEntity<String> closeExpiredBookings() {
+		int count = slotBookingService.closeExpiredBookings();
+		return ResponseEntity.ok("Closed " + count + " expired booking(s)");
 	}
 
 	@DeleteMapping(path = RestUri.CANCEL_BOOKING)

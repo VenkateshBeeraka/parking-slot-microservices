@@ -3,6 +3,10 @@ package com.parking.common.dto;
 import java.io.Serializable;
 import java.util.Date;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.parking.common.config.MultiDateDeserializer;
+
 public class BookingNotificationEvent implements Serializable {
 
 	private static final long serialVersionUID = 1L;
@@ -14,8 +18,15 @@ public class BookingNotificationEvent implements Serializable {
 	private String buildingNumber;
 	private String buildingName;
 	private String slotNumber;
+
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date bookingDate;
+
 	private String status;
+
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date timestamp;
 
 	public BookingNotificationEvent() {

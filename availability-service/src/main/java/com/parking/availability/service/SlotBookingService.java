@@ -26,6 +26,8 @@ import com.parking.common.entity.SlotBooking;
 import com.parking.common.entity.User;
 import com.parking.common.exception.ResourceNotFoundException;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 public class SlotBookingService {
 
@@ -62,6 +64,13 @@ public class SlotBookingService {
 	}
 
 	public String bookSlot(String buildNumber, String slotNo, Date bookingdate) {
+		if (bookingdate == null) {
+			throw new IllegalArgumentException("Booking date and time must be provided");
+		}
+		if (bookingdate.before(new Date())) {
+			throw new IllegalArgumentException("Cannot book slot for past date and time: " + bookingdate);
+		}
+
 		Integer userId = idheader();
 		boolean booking = true;
 		List<Building> listB = buildingRepository.findAll();
@@ -100,7 +109,7 @@ public class SlotBookingService {
 								return "Booking Sucessfull";
 							} else {
 								for (SlotBooking sb : abook) {
-									if (sb.getBookingDate().equals(bookingdate)) {
+									if (isSameSecond(sb.getBookingDate(), bookingdate) && !"CLOSED".equalsIgnoreCase(sb.getStatus())) {
 										booking = false;
 										break;
 									}
@@ -123,13 +132,20 @@ public class SlotBookingService {
 								}
 							}
 						} else {
-							throw new ResourceNotFoundException("not available on the date " + bookingdate);
+							throw new ResourceNotFoundException("not available on the date and time " + bookingdate);
 						}
 					}
 				}
 			}
 		}
 		throw new ResourceNotFoundException("Building Number not valid =" + buildNumber);
+	}
+
+	private boolean isSameSecond(Date d1, Date d2) {
+		if (d1 == null || d2 == null) {
+			return false;
+		}
+		return (d1.getTime() / 1000) == (d2.getTime() / 1000);
 	}
 
 	private void sendBookingNotification(User user, Building build, Slot slot, Date bookingDate, Integer bookingId) {
@@ -164,16 +180,39 @@ public class SlotBookingService {
 	public String cancelSlotBook(Integer id) {
 		Integer userId = idheader();
 		SlotBooking booking = slotBookingRepository.findById(id).orElse(null);
-		Date date = new Date();
+		Date now = new Date();
 		if (booking != null) {
 			if (booking.getUser() != null && booking.getUser().getId().equals(userId)) {
-				if (date.compareTo(booking.getBookingDate()) < 0) {
+				if (now.before(booking.getBookingDate())) {
 					slotBookingRepository.delete(booking);
 					return "Booking Cancelled";
+				} else {
+					throw new IllegalArgumentException("Cannot cancel booking as booking date and time has already passed.");
 				}
 			}
 		}
 		throw new ResourceNotFoundException("enter valid slot booking Id " + id);
+	}
+
+	@Transactional
+	public int closeExpiredBookings() {
+		Date now = new Date();
+		List<SlotBooking> expiredBookings = slotBookingRepository.findExpiredBookings(now);
+		if (expiredBookings != null && !expiredBookings.isEmpty()) {
+			for (SlotBooking booking : expiredBookings) {
+				String oldStatus = booking.getStatus();
+				booking.setStatus("CLOSED");
+				log.info("⏰ Closed slot booking [ID: {}, Slot: {}, Booking Time: {}, Previous Status: {}]",
+						booking.getId(),
+						(booking.getSlot() != null ? booking.getSlot().getSlotNumber() : "N/A"),
+						booking.getBookingDate(),
+						oldStatus);
+			}
+			slotBookingRepository.saveAll(expiredBookings);
+			log.info("✅ Marked {} slot booking(s) as CLOSED (booking time crossed present time).", expiredBookings.size());
+			return expiredBookings.size();
+		}
+		return 0;
 	}
 
 	public long countBookings() {

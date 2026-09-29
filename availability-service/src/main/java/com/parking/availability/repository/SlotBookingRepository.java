@@ -1,5 +1,6 @@
 package com.parking.availability.repository;
 
+import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,7 @@ public interface SlotBookingRepository extends JpaRepository<SlotBooking, Intege
 	@Query(value = "select b.id as id, s.slot_number as slotNo, bi.building_number as buildingNo, b.status as status, b.booking_date as bookingDate "
 			+ "from slot s inner join slot_booking b on s.id=b.slot_id join building bi on bi.id=s.building_id where b.user_id=:id order by b.booking_date", nativeQuery = true)
 	List<Bookings> endUserResult(@Param("id") Integer id);
+
+	@Query("SELECT b FROM SlotBooking b WHERE b.bookingDate <= :now AND UPPER(b.status) != 'CLOSED'")
+	List<SlotBooking> findExpiredBookings(@Param("now") Date now);
 }
