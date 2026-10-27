@@ -3,10 +3,12 @@ package com.parking.auth.service;
 import java.util.ArrayList;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.parking.auth.repository.AuthenticationRepository;
 import com.parking.auth.security.LoginPrincipal;
@@ -30,14 +32,23 @@ public class AuthenticationService {
 	private AuthenticationRepository authenticationRepository;
 
 	public User saveuser(UserDTO dto) {
+		String email = dto.getEmail() != null ? dto.getEmail().trim() : null;
+		if (email == null || email.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
+		}
+		if (authenticationRepository.findByEmail(email) != null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
+		}
+
+		// Self-registration always creates a regular user. The id is generated and the role
+		// and buildings are never taken from the request, so callers cannot overwrite an
+		// existing account or grant themselves admin rights.
 		User user = new User();
-		user.setId(dto.getId());
 		user.setName(dto.getName());
-		user.setEmail(dto.getEmail());
+		user.setEmail(email);
 		user.setPassword(dto.getPassword());
 		user.setCity(dto.getCity());
-		user.setRole(dto.getRole());
-		user.setBuildings(dto.getBuildings());
+		user.setRole("USER");
 		return authenticationRepository.save(user);
 	}
 

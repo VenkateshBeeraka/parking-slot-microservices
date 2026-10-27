@@ -1,18 +1,23 @@
 package com.parking.availability.service;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.parking.availability.repository.AuthenticationRepository;
 import com.parking.availability.repository.AvailabilityRepository;
@@ -63,92 +68,71 @@ public class SlotBookingService {
 		return "user";
 	}
 
-	public String bookSlot(String buildNumber, String slotNo, Date bookingdate) {
+	// Bookings without an explicit end last one hour; no single booking may exceed a week
+	public static final long DEFAULT_DURATION_MS = 60L * 60 * 1000;
+	public static final long MAX_DURATION_MS = 7L * 24 * 60 * 60 * 1000;
+
+	// synchronized so the overlap check and the insert cannot interleave within this instance
+	public synchronized String bookSlot(String buildNumber, String slotNo, Date bookingdate, Date endDate) {
 		if (bookingdate == null) {
-			throw new IllegalArgumentException("Booking date and time must be provided");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A start date and time is required");
 		}
 		if (bookingdate.before(new Date())) {
-			throw new IllegalArgumentException("Cannot book slot for past date and time: " + bookingdate);
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The start time must be in the future");
+		}
+		Date end = endDate != null ? endDate : new Date(bookingdate.getTime() + DEFAULT_DURATION_MS);
+		if (!end.after(bookingdate)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The end time must be after the start time");
+		}
+		if (end.getTime() - bookingdate.getTime() > MAX_DURATION_MS) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A booking can be at most 7 days long");
 		}
 
 		Integer userId = idheader();
-		boolean booking = true;
-		List<Building> listB = buildingRepository.findAll();
-
-		for (Building build : listB) {
-			if (build.getBuildingNumber().equals(buildNumber)) {
-				if (build.getSlots() == null || build.getSlots().isEmpty()) {
-					throw new ResourceNotFoundException("No slots are present in this building");
+		for (Building build : buildingRepository.findAll()) {
+			if (!build.getBuildingNumber().equals(buildNumber)) {
+				continue;
+			}
+			if (build.getSlots() == null || build.getSlots().isEmpty()) {
+				throw new ResourceNotFoundException("No slots are present in this building");
+			}
+			for (Slot slot : build.getSlots()) {
+				if (!slot.getSlotNumber().equals(slotNo)) {
+					continue;
 				}
-				for (Slot slot : build.getSlots()) {
-					if (slot.getSlotNumber().equals(slotNo)) {
-						if (slot.getAvailability() == null) {
-							throw new ResourceNotFoundException("no availability for this slot");
-						}
-						Availability avail = slot.getAvailability();
-
-						if (!bookingdate.before(avail.getFromDate()) && !bookingdate.after(avail.getToDate())) {
-							List<SlotBooking> abook = avail.getBookings();
-							if (abook == null) {
-								abook = new ArrayList<>();
-								avail.setBookings(abook);
-							}
-
-							if (abook.isEmpty()) {
-								User user = authenticationRepository.findById(userId).orElse(null);
-								SlotBooking slotbook = new SlotBooking();
-								slotbook.setBookingDate(bookingdate);
-								slotbook.setUser(user);
-								slotbook.setSlot(slot);
-								slotbook = slotBookingRepository.save(slotbook);
-
-								abook.add(slotbook);
-								avail.setBookings(abook);
-								availabilityRepository.save(avail);
-								sendBookingNotification(user, build, slot, bookingdate, slotbook.getId());
-								return "Booking Sucessfull";
-							} else {
-								for (SlotBooking sb : abook) {
-									if (isSameSecond(sb.getBookingDate(), bookingdate) && !"CLOSED".equalsIgnoreCase(sb.getStatus())) {
-										booking = false;
-										break;
-									}
-								}
-								if (booking) {
-									User user = authenticationRepository.findById(userId).orElse(null);
-									SlotBooking slotbook = new SlotBooking();
-									slotbook.setBookingDate(bookingdate);
-									slotbook.setUser(user);
-									slotbook.setSlot(slot);
-									slotbook = slotBookingRepository.save(slotbook);
-
-									abook.add(slotbook);
-									avail.setBookings(abook);
-									availabilityRepository.save(avail);
-									sendBookingNotification(user, build, slot, bookingdate, slotbook.getId());
-									return "Booking Sucessfull";
-								} else {
-									throw new ResourceNotFoundException("Already booked");
-								}
-							}
-						} else {
-							throw new ResourceNotFoundException("not available on the date and time " + bookingdate);
-						}
-					}
+				Availability avail = slot.getAvailability();
+				if (avail == null) {
+					throw new ResponseStatusException(HttpStatus.CONFLICT, "This slot is not open for booking");
 				}
+				// The whole stay must fall inside the slot's bookable window
+				if (bookingdate.before(avail.getFromDate()) || end.after(avail.getToDate())) {
+					throw new ResponseStatusException(HttpStatus.CONFLICT, "This slot is not bookable for the whole of that time");
+				}
+				if (slotBookingRepository.countOverlapping(slot.getId(), bookingdate, end) > 0) {
+					throw new ResponseStatusException(HttpStatus.CONFLICT, "This slot is already booked for part of that time");
+				}
+
+				User user = authenticationRepository.findById(userId).orElse(null);
+				SlotBooking slotbook = new SlotBooking();
+				slotbook.setBookingDate(bookingdate);
+				slotbook.setEndDate(end);
+				slotbook.setUser(user);
+				slotbook.setSlot(slot);
+				slotbook = slotBookingRepository.save(slotbook);
+
+				if (avail.getBookings() == null) {
+					avail.setBookings(new ArrayList<>());
+				}
+				avail.getBookings().add(slotbook);
+				availabilityRepository.save(avail);
+				sendBookingNotification(user, build, slot, bookingdate, end, slotbook.getId());
+				return "Booking Sucessfull";
 			}
 		}
 		throw new ResourceNotFoundException("Building Number not valid =" + buildNumber);
 	}
 
-	private boolean isSameSecond(Date d1, Date d2) {
-		if (d1 == null || d2 == null) {
-			return false;
-		}
-		return (d1.getTime() / 1000) == (d2.getTime() / 1000);
-	}
-
-	private void sendBookingNotification(User user, Building build, Slot slot, Date bookingDate, Integer bookingId) {
+	private void sendBookingNotification(User user, Building build, Slot slot, Date bookingDate, Date endDate, Integer bookingId) {
 		try {
 			if (kafkaTemplate != null) {
 				String userEmail = (user != null && user.getEmail() != null) ? user.getEmail() : "user" + idheader() + "@parking.com";
@@ -168,6 +152,7 @@ public class SlotBookingService {
 						bookingDate,
 						"CONFIRMED"
 				);
+				event.setEndDate(endDate);
 
 				kafkaTemplate.send(BOOKING_TOPIC, String.valueOf(event.getBookingId()), event);
 				log.info("📤 Published BookingNotificationEvent to topic '{}' for user: {}", BOOKING_TOPIC, userEmail);
@@ -187,7 +172,7 @@ public class SlotBookingService {
 					slotBookingRepository.delete(booking);
 					return "Booking Cancelled";
 				} else {
-					throw new IllegalArgumentException("Cannot cancel booking as booking date and time has already passed.");
+					throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This reservation has already started and can no longer be cancelled");
 				}
 			}
 		}
@@ -209,10 +194,41 @@ public class SlotBookingService {
 						oldStatus);
 			}
 			slotBookingRepository.saveAll(expiredBookings);
-			log.info("✅ Marked {} slot booking(s) as CLOSED (booking time crossed present time).", expiredBookings.size());
+			log.info("✅ Marked {} slot booking(s) as CLOSED (end time has passed).", expiredBookings.size());
 			return expiredBookings.size();
 		}
 		return 0;
+	}
+
+	public List<Map<String, Object>> getMyBookings() {
+		return toBookingDetails(slotBookingRepository.findBookingDetailsByUser(idheader()), false);
+	}
+
+	public List<Map<String, Object>> getAllBookingDetails() {
+		return toBookingDetails(slotBookingRepository.findAllBookingDetails(), true);
+	}
+
+	private List<Map<String, Object>> toBookingDetails(List<Object[]> rows, boolean includeUser) {
+		// Same wall-clock format the booking was submitted in
+		SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		List<Map<String, Object>> result = new ArrayList<>();
+		for (Object[] r : rows) {
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("id", r[0]);
+			m.put("slotNumber", r[1]);
+			m.put("buildingNumber", r[2]);
+			m.put("buildingName", r[3]);
+			m.put("status", r[4]);
+			m.put("bookingDate", r[5] instanceof Date ? fmt.format((Date) r[5]) : r[5]);
+			m.put("endDate", r[6] instanceof Date ? fmt.format((Date) r[6]) : r[6]);
+			if (includeUser) {
+				m.put("userId", r[7]);
+				m.put("userName", r[8]);
+				m.put("userEmail", r[9]);
+			}
+			result.add(m);
+		}
+		return result;
 	}
 
 	public long countBookings() {

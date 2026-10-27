@@ -1,6 +1,7 @@
 package com.parking.notification.service;
 
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,9 +43,7 @@ public class EmailNotificationService {
 
 		String recipient = event.getRecipientEmail();
 		String subject = "✅ Parking Slot Confirmed - Slot " + event.getSlotNumber() + " (" + event.getBuildingName() + ")";
-		String formattedDate = event.getBookingDate() != null
-				? new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(event.getBookingDate())
-				: "N/A";
+		String formattedDate = formatPeriod(event.getBookingDate(), event.getEndDate());
 
 		String plainTextBody = buildPlainTextEmail(event, formattedDate);
 		String htmlBody = buildHtmlEmail(event, formattedDate);
@@ -74,6 +73,20 @@ public class EmailNotificationService {
 			// Free logger fallback: print formatted email in console
 			logFormattedEmail(recipient, subject, plainTextBody);
 		}
+	}
+
+	// "2026-10-30 10:00 – 13:00", or the full end date when the stay runs past midnight
+	private String formatPeriod(Date start, Date end) {
+		if (start == null) {
+			return "N/A";
+		}
+		SimpleDateFormat full = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+		if (end == null) {
+			return full.format(start);
+		}
+		SimpleDateFormat day = new SimpleDateFormat("yyyy-MM-dd");
+		String endText = day.format(start).equals(day.format(end)) ? new SimpleDateFormat("HH:mm").format(end) : full.format(end);
+		return full.format(start) + " – " + endText;
 	}
 
 	private boolean isSmtpConfigured() {

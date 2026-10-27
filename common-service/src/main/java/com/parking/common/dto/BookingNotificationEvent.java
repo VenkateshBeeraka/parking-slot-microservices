@@ -23,9 +23,14 @@ public class BookingNotificationEvent implements Serializable {
 	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date bookingDate;
 
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
+	private Date endDate;
+
 	private String status;
 
-	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	// An instant, so it is serialized with an explicit UTC offset (bookingDate stays wall-clock)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
 	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date timestamp;
 
@@ -113,6 +118,14 @@ public class BookingNotificationEvent implements Serializable {
 		this.bookingDate = bookingDate;
 	}
 
+	public Date getEndDate() {
+		return endDate;
+	}
+
+	public void setEndDate(Date endDate) {
+		this.endDate = endDate;
+	}
+
 	public String getStatus() {
 		return status;
 	}
@@ -134,6 +147,7 @@ public class BookingNotificationEvent implements Serializable {
 		return "BookingNotificationEvent [bookingId=" + bookingId + ", userId=" + userId + ", recipientEmail="
 				+ recipientEmail + ", recipientName=" + recipientName + ", buildingNumber=" + buildingNumber
 				+ ", buildingName=" + buildingName + ", slotNumber=" + slotNumber + ", bookingDate=" + bookingDate
+				+ ", endDate=" + endDate
 				+ ", status=" + status + ", timestamp=" + timestamp + "]";
 	}
 }

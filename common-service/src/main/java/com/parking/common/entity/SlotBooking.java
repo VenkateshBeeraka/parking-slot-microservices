@@ -31,6 +31,13 @@ public class SlotBooking {
 	@JsonDeserialize(using = MultiDateDeserializer.class)
 	private Date bookingDate;
 
+	// End of the reserved period. Null for bookings made before end times existed (treated as one hour).
+	@DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+	@Temporal(TemporalType.TIMESTAMP)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+	@JsonDeserialize(using = MultiDateDeserializer.class)
+	private Date endDate;
+
 	@JsonIgnore
 	@ManyToOne
 	private User user;
@@ -90,6 +97,14 @@ public class SlotBooking {
 
 	public void setBookingDate(Date bookingDate) {
 		this.bookingDate = bookingDate;
+	}
+
+	public Date getEndDate() {
+		return endDate;
+	}
+
+	public void setEndDate(Date endDate) {
+		this.endDate = endDate;
 	}
 
 	@Override

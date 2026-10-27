@@ -2,6 +2,7 @@ package com.parking.availability.controller;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,12 +33,10 @@ public class SlotBookingController {
 			@PathVariable String buildingNumber,
 			@PathVariable String slotNumber,
 			@PathVariable(required = false) Date date,
-			@RequestParam(name = "date", required = false) Date dateParam) {
+			@RequestParam(name = "date", required = false) Date dateParam,
+			@RequestParam(name = "endDate", required = false) Date endDate) {
 		Date bookingDate = (date != null) ? date : dateParam;
-		if (bookingDate == null) {
-			throw new IllegalArgumentException("Booking date and time must be provided (e.g., 'yyyy-MM-dd HH:mm:ss' or 'yyyy-MM-ddTHH:mm:ss')");
-		}
-		return ResponseEntity.status(HttpStatus.OK).body(slotBookingService.bookSlot(buildingNumber, slotNumber, bookingDate));
+		return ResponseEntity.status(HttpStatus.OK).body(slotBookingService.bookSlot(buildingNumber, slotNumber, bookingDate, endDate));
 	}
 
 	@PreAuthorize("hasAuthority('admin')")
@@ -58,8 +57,21 @@ public class SlotBookingController {
 		return ResponseEntity.ok(slotBookingService.countBookings());
 	}
 
-	@GetMapping(path = {"/booking", "/booking/all"})
+	// Internal endpoint used by admin-service via Feign
+	@GetMapping(path = "/booking")
 	public ResponseEntity<List<SlotBooking>> getAllBookings() {
 		return ResponseEntity.ok(slotBookingService.getAllBookings());
+	}
+
+	@PreAuthorize("hasAnyAuthority('user', 'admin')")
+	@GetMapping(path = "/booking/my")
+	public ResponseEntity<List<Map<String, Object>>> getMyBookings() {
+		return ResponseEntity.ok(slotBookingService.getMyBookings());
+	}
+
+	@PreAuthorize("hasAuthority('admin')")
+	@GetMapping(path = "/booking/all")
+	public ResponseEntity<List<Map<String, Object>>> getAllBookingDetails() {
+		return ResponseEntity.ok(slotBookingService.getAllBookingDetails());
 	}
 }

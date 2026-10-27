@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.parking.availability.service.AvailabilityService;
+import com.parking.availability.service.SlotBookingService;
 import com.parking.common.constant.RestUri;
 import com.parking.common.dto.AvailabilityDTO;
 
@@ -49,11 +50,15 @@ public class AvailabilityController {
 	public ResponseEntity<List<String>> getAvailability(
 			@PathVariable String buildNumber,
 			@PathVariable(required = false) Date date,
-			@RequestParam(name = "date", required = false) Date dateParam) {
+			@RequestParam(name = "date", required = false) Date dateParam,
+			@RequestParam(name = "endDate", required = false) Date endParam) {
 		Date searchDate = (date != null) ? date : dateParam;
 		if (searchDate == null) {
 			searchDate = new Date();
 		}
-		return ResponseEntity.status(HttpStatus.OK).body(availabilityService.findAvailability(buildNumber, searchDate));
+		Date searchEnd = (endParam != null && endParam.after(searchDate))
+				? endParam
+				: new Date(searchDate.getTime() + SlotBookingService.DEFAULT_DURATION_MS);
+		return ResponseEntity.status(HttpStatus.OK).body(availabilityService.findAvailability(buildNumber, searchDate, searchEnd));
 	}
 }

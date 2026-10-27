@@ -7,8 +7,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.crypto.spec.SecretKeySpec;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -55,23 +53,11 @@ public class JwtUtil {
 	}
 
 	public Claims getAllClaims(String token) {
-		try {
-			return Jwts.parserBuilder()
-					.setSigningKey(getSigningKey())
-					.build()
-					.parseClaimsJws(token)
-					.getBody();
-		} catch (Exception e) {
-			try {
-				Key fallbackKey = new SecretKeySpec("parkingslot".getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-				return Jwts.parserBuilder()
-						.setSigningKey(fallbackKey)
-						.build()
-						.parseClaimsJws(token)
-						.getBody();
-			} catch (Exception ignored) {
-			}
-			throw e;
-		}
+		// Only tokens signed with the configured secret are accepted
+		return Jwts.parserBuilder()
+				.setSigningKey(getSigningKey())
+				.build()
+				.parseClaimsJws(token)
+				.getBody();
 	}
 }

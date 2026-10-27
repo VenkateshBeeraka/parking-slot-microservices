@@ -18,7 +18,7 @@ public class UserDTO {
 	@NotBlank
 	@Pattern(regexp = "^(?=.*\\d)(?=.*[A-Za-z])[A-Za-z0-9]{8,20}$", message = "Passwords should have at least 8 characters and alphanumeric")
 	private String password;
-	@NotBlank
+	// Ignored on self-registration; only admins may change a role
 	private String role;
 	@NotBlank
 	private String city;
@@ -82,7 +82,7 @@ public class UserDTO {
 
 	public UserDTO(Integer id, @NotBlank String name, @Email String email,
 			@NotBlank @Pattern(regexp = "^(?=.*\\d)(?=.*[A-Za-z])[A-Za-z0-9]{8,20}$", message = "Passwords should have at least 8 characters and alphanumeric") String password,
-			@NotBlank String role, @NotBlank String city) {
+			String role, @NotBlank String city) {
 		super();
 		this.id = id;
 		this.name = name;

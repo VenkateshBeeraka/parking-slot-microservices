@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS slot (
 CREATE TABLE IF NOT EXISTS slot_booking (
     id INTEGER NOT NULL PRIMARY KEY,
     booking_date TIMESTAMP(6) WITHOUT TIME ZONE,
+    end_date TIMESTAMP(6) WITHOUT TIME ZONE,
     status VARCHAR(255),
     slot_id INTEGER REFERENCES slot(id),
     user_id INTEGER REFERENCES users(id),
@@ -100,10 +101,10 @@ INSERT INTO slot (id, slot_number, floornumber, division_no, building_id, availa
 ON CONFLICT (id) DO NOTHING;
 
 -- Slot Bookings
-INSERT INTO slot_booking (id, booking_date, status, slot_id, user_id, availabilty_id) VALUES
-(1, '2026-09-14 10:00:00', 'SLOT BOOKED', 1, 2, 1),
-(2, '2026-09-14 11:30:00', 'CONFIRMED', 2, 3, 2),
-(3, '2026-09-15 14:00:00', 'SLOT BOOKED', 3, 2, 3)
+INSERT INTO slot_booking (id, booking_date, end_date, status, slot_id, user_id, availabilty_id) VALUES
+(1, '2026-09-14 10:00:00', '2026-09-14 12:00:00', 'SLOT BOOKED', 1, 2, 1),
+(2, '2026-09-14 11:30:00', '2026-09-14 13:30:00', 'CONFIRMED', 2, 3, 2),
+(3, '2026-09-15 14:00:00', '2026-09-15 18:00:00', 'SLOT BOOKED', 3, 2, 3)
 ON CONFLICT (id) DO NOTHING;
 
 -- Ensure sequence values start beyond pre-seeded IDs

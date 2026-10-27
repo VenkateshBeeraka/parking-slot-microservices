@@ -13,9 +13,10 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 public class MultiDateDeserializer extends JsonDeserializer<Date> {
 
 	private static final String[] DATE_PATTERNS = new String[] {
+		// Offset-aware pattern first: the plain 'T' pattern would otherwise match and ignore the offset
+		"yyyy-MM-dd'T'HH:mm:ss.SSSX",
 		"yyyy-MM-dd HH:mm:ss",
 		"yyyy-MM-dd'T'HH:mm:ss",
-		"yyyy-MM-dd'T'HH:mm:ss.SSSX",
 		"yyyy-MM-dd'T'HH:mm:ss.SSS",
 		"yyyy-MM-dd HH:mm",
 		"yyyy-MM-dd'T'HH:mm",

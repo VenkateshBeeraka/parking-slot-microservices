@@ -2,8 +2,12 @@ package com.parking.common.entity;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
@@ -15,9 +19,12 @@ import jakarta.persistence.UniqueConstraint;
 public class User {
 
 	@Id
+	@GeneratedValue(strategy = GenerationType.TABLE)
 	private Integer id;
 	private String name;
 	private String email;
+	// Accepted on input but never serialized into API responses
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
 	private String password;
 	private String role;
 	private String city;

@@ -6,6 +6,8 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +37,17 @@ public class NotificationController {
 				"kafkaListener", "ACTIVE",
 				"totalRecentEvents", emailNotificationService.getRecentNotifications().size()
 		));
+	}
+
+	@GetMapping("/my")
+	@Operation(summary = "Get recent notifications for the signed-in user")
+	public ResponseEntity<List<BookingNotificationEvent>> getMyNotifications() {
+		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+		Integer userId = (auth != null && auth.getPrincipal() instanceof Integer) ? (Integer) auth.getPrincipal() : null;
+		List<BookingNotificationEvent> mine = emailNotificationService.getRecentNotifications().stream()
+				.filter(n -> userId != null && userId.equals(n.getUserId()))
+				.toList();
+		return ResponseEntity.ok(mine);
 	}
 
 	@GetMapping("/recent")
